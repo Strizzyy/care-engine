@@ -143,6 +143,27 @@ st.markdown("""
         background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
     }
     
+    /* Remove extra spacing */
+    .stSelectbox {
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* Compact sidebar elements */
+    .sidebar .element-container {
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* Remove default margins from markdown in sidebar */
+    .sidebar .stMarkdown {
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* Compact customer info display */
+    .customer-info {
+        margin-top: 0.5rem !important;
+        margin-bottom: 1rem !important;
+    }
+    
     /* Form styling */
     .stTextInput > div > div > input {
         border-radius: 8px;
@@ -156,41 +177,53 @@ st.markdown("""
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
     
-    /* Selectbox styling */
+    /* Selectbox styling - Fixed visibility */
     .stSelectbox > div > div {
-        background-color: white;
+        background-color: #f8fafc !important;
         border-radius: 8px;
-        border: 2px solid #e2e8f0;
+        border: 2px solid #cbd5e1 !important;
+        color: #1f2937 !important;
+    }
+    
+    /* Selectbox input field */
+    .stSelectbox > div > div > div[data-baseweb="select"] > div {
+        background-color: #f8fafc !important;
+        color: #1f2937 !important;
+        border: none !important;
+    }
+    
+    /* Selectbox dropdown container */
+    .stSelectbox [data-baseweb="popover"] {
+        background-color: #ffffff !important;
+        border: 2px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15) !important;
     }
     
     /* Selectbox dropdown options */
-    .stSelectbox > div > div > div {
-        background-color: white !important;
-        color: #374151 !important;
-    }
-    
-    /* Selectbox dropdown menu */
-    .stSelectbox [data-baseweb="select"] > div {
-        background-color: white !important;
-        color: #374151 !important;
-    }
-    
-    /* Selectbox options in dropdown */
     .stSelectbox [role="option"] {
-        background-color: white !important;
-        color: #374151 !important;
+        background-color: #ffffff !important;
+        color: #1f2937 !important;
+        padding: 0.75rem 1rem !important;
+        border-bottom: 1px solid #f1f5f9 !important;
     }
     
     /* Selectbox option hover state */
     .stSelectbox [role="option"]:hover {
-        background-color: #f3f4f6 !important;
-        color: #111827 !important;
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
     }
     
     /* Selectbox selected option */
     .stSelectbox [aria-selected="true"] {
-        background-color: #3b82f6 !important;
-        color: white !important;
+        background-color: #1e40af !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Selectbox placeholder text */
+    .stSelectbox [data-baseweb="select"] [data-baseweb="input"] {
+        color: #1f2937 !important;
     }
     
     /* File uploader styling */
@@ -430,7 +463,6 @@ def customer_support_page():
     # Sidebar with customer selection and quick actions
     with st.sidebar:
         st.markdown("### 👤 Select Customer")
-        st.markdown("---")
         
         customer_options = [f"{c.get('name', 'Unknown')} ({c.get('customer_id', 'N/A')})" for c in customers]
         selected_idx = st.selectbox(
