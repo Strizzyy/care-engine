@@ -97,36 +97,19 @@ class ResolutionAgent:
         try:
             img_base64 = base64.b64encode(state['image_data']).decode('utf-8')
             prompt = f"""
-            You are an AI agent for validating refund requests based on images. Analyze the uploaded image carefully.
+            Analyze this refund image quickly. Customer: {state['customer_id']}, Order: {state['order_id']}, Amount: ₹{state['refund_amount']}
             
-            Customer ID: {state['customer_id']}
-            Order ID: {state['order_id']}
-            Refund Amount: ₹{state['refund_amount']}
-            Customer Message: {state['message']}
+            Look for: damage, defects, wrong items
             
-            INSTRUCTIONS:
-            1. Examine the image for clear evidence of:
-               - Visible damage (broken, cracked, spoiled)
-               - Defective products (wrong color, size, missing parts)
-               - Incorrect items (different from what was ordered)
-            
-            2. Decision criteria:
-               - If damage/defect is CLEARLY visible and obvious → status: "resolved"
-               - If image is unclear, blurry, or no obvious issue → status: "escalated"
-               - If you cannot determine the issue → status: "escalated"
-            
-            3. Provide confidence score (0.0-1.0):
-               - 0.8-1.0: Very clear damage/defect
-               - 0.5-0.7: Some evidence but unclear
-               - 0.0-0.4: No clear evidence or unclear image
-            
-            Return ONLY a valid JSON object:
+            Return JSON only:
             {{
                 "status": "resolved" or "escalated",
-                "message": "Brief explanation of decision",
+                "message": "Brief reason",
                 "confidence": 0.0-1.0,
-                "reason": "damage_visible" or "unclear_image" or "no_issue_detected"
+                "reason": "damage_visible" or "unclear_image"
             }}
+            
+            Rules: Clear damage = resolved, Unclear = escalated
             """
             
             response = self.model.generate_content([

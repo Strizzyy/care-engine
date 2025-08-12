@@ -357,15 +357,17 @@ async def validate_request(file: UploadFile = File(...), message: str = Form("")
                 "reference_id": f"REF-ERR-{datetime.now().strftime('%Y%m%d%H%M%S')}"
             }
         
-        # Generate case ID and extract order info
+        # Generate case ID and extract order info - optimized
         case_id = str(uuid.uuid4())
         order_id = resolution_agent._extract_order_id(message)
         
-        # If no order ID found in message, provide a default message that includes context
-        if not order_id and message in ["Image uploaded", "Refund request with image", ""]:
-            message = "Refund request with image - please process based on uploaded evidence"
-        
-        refund_amount = await data_handler.get_order_amount(order_id) if order_id else None
+        # Quick order amount lookup
+        refund_amount = None
+        if order_id:
+            try:
+                refund_amount = await data_handler.get_order_amount(order_id)
+            except:
+                refund_amount = 100.0  # Default fallback
         
         # Process through LangGraph agent
         validation_result = await resolution_agent.process_request(

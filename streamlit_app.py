@@ -80,12 +80,12 @@ if "backend_started" not in st.session_state:
     st.session_state.backend_started = False
 
 def start_backend():
-    """Start FastAPI backend if not running"""
+    """Start FastAPI backend if not running - optimized for speed"""
     if st.session_state.backend_started:
         return True
         
     try:
-        response = requests.get(f"{API_BASE_URL}/health", timeout=2)
+        response = requests.get(f"{API_BASE_URL}/health", timeout=1)
         if response.status_code == 200:
             st.session_state.backend_started = True
             return True
@@ -101,11 +101,11 @@ def start_backend():
         from fast_api import app
         
         def run_server():
-            uvicorn.run(app, host="0.0.0.0", port=7860, log_level="error")
+            uvicorn.run(app, host="0.0.0.0", port=7860, log_level="error", workers=1)
         
         backend_thread = threading.Thread(target=run_server, daemon=True)
         backend_thread.start()
-        time.sleep(5)  # Wait for server to start
+        time.sleep(2)  # Reduced wait time
         st.session_state.backend_started = True
         return True
     except Exception as e:
@@ -113,62 +113,81 @@ def start_backend():
         st.error(f"Failed to start backend: {e}")
         return False
 
+@st.cache_data(ttl=60)  # Cache for 60 seconds
 def get_customers():
-    """Fetch customers from API"""
+    """Fetch customers from API with caching for speed"""
     try:
-        response = requests.get(f"{API_BASE_URL}/customers", timeout=10)
+        response = requests.get(f"{API_BASE_URL}/customers", timeout=5)
         if response.status_code == 200:
-            return response.json().get('customers', [])
-        return []
+            customers = response.json().get('customers', [])
+            return customers
+        else:
+            return []
     except Exception as e:
-        st.error(f"Error fetching customers: {e}")
+        logging.error(f"Error fetching customers: {e}")
         return []
 
+@st.cache_data(ttl=30)  # Cache for 30 seconds
 def get_customer_info(customer_id):
-    """Fetch customer information"""
+    """Fetch customer information with caching"""
     try:
-        response = requests.get(f"{API_BASE_URL}/customer/{customer_id}", timeout=10)
+        response = requests.get(f"{API_BASE_URL}/customer/{customer_id}", timeout=3)
         if response.status_code == 200:
             return response.json()
         return None
     except Exception as e:
-        st.error(f"Error fetching customer info: {e}")
+        logging.error(f"Error fetching customer info: {e}")
         return None
 
 def send_message(message, customer_id, file=None):
-    """Send message to chat API"""
+    """Send message to chat API - optimized for speed"""
     try:
         if file:
+            # Quick file size check (max 5MB for faster processing)
+            if len(file.getvalue()) > 5 * 1024 * 1024:
+                st.error("File too large. Please use images under 5MB for faster processing.")
+                return None
+            
             files = {'file': (file.name, file.getvalue(), 'image/jpeg')}
             data = {'message': message or "Refund request with image", 'customer_id': customer_id}
-            response = requests.post(f"{API_BASE_URL}/validate", files=files, data=data, timeout=30)
+            response = requests.post(f"{API_BASE_URL}/validate", files=files, data=data, timeout=20)
         else:
+            if not message or not message.strip():
+                st.error("Please enter a message.")
+                return None
+            
             response = requests.post(f"{API_BASE_URL}/chat", 
-                                   json={"message": message, "customer_id": customer_id}, 
-                                   timeout=10)
+                                   json={"message": message.strip(), "customer_id": customer_id}, 
+                                   timeout=5)
         
         if response.status_code == 200:
             return response.json()
         else:
-            st.error(f"API Error: {response.status_code}")
+            st.error(f"Server error. Please try again.")
             return None
+            
+    except requests.exceptions.Timeout:
+        st.error("Request timed out. Please try again.")
+        return None
     except Exception as e:
-        st.error(f"Error sending message: {e}")
+        logging.error(f"Error: {e}")
+        st.error("Please try again.")
         return None
 
+@st.cache_data(ttl=10)  # Cache for 10 seconds - frequent updates needed
 def get_escalations():
-    """Get all escalated cases"""
+    """Get all escalated cases with caching"""
     try:
-        response = requests.get(f"{API_BASE_URL}/escalations/all", timeout=10)
+        response = requests.get(f"{API_BASE_URL}/escalations/all", timeout=3)
         if response.status_code == 200:
             return response.json().get('escalations', [])
         return []
     except Exception as e:
-        st.error(f"Error fetching escalations: {e}")
+        logging.error(f"Error fetching escalations: {e}")
         return []
 
 def resolve_escalation(case_id, resolution_type, notes):
-    """Resolve an escalated case"""
+    """Resolve an escalated case - optimized"""
     try:
         resolution_data = {
             "resolution_type": resolution_type,
@@ -177,10 +196,14 @@ def resolve_escalation(case_id, resolution_type, notes):
             "resolved_at": datetime.now().isoformat()
         }
         response = requests.post(f"{API_BASE_URL}/escalation/{case_id}/resolve", 
-                               json=resolution_data, timeout=10)
-        return response.status_code == 200
+                               json=resolution_data, timeout=5)
+        if response.status_code == 200:
+            # Clear cache to show updated data
+            get_escalations.clear()
+            return True
+        return False
     except Exception as e:
-        st.error(f"Error resolving case: {e}")
+        logging.error(f"Error resolving case: {e}")
         return False
 
 def customer_support_page():
@@ -288,13 +311,24 @@ def customer_support_page():
                                 "timestamp": datetime.now().isoformat()
                             })
                             
-                            # Show status
-                            if response.get('status') == 'resolved':
+                            # Show status with detailed feedback
+                            status = response.get('status')
+                            if status == 'resolved':
                                 st.success("✅ Request resolved successfully!")
-                            elif response.get('status') == 'escalated':
+                                if 'refund' in response.get('message', '').lower():
+                                    st.balloons()  # Celebration for successful refund
+                            elif status == 'escalated':
                                 st.warning("⚠️ Request escalated for human review")
-                            elif response.get('status') == 'pending_image':
+                                if response.get('case_id'):
+                                    st.info(f"📋 Case ID: {response.get('case_id')} - You'll be notified once reviewed")
+                            elif status == 'pending_image':
                                 st.info("ℹ️ Please upload an image for validation")
+                            elif status == 'error':
+                                st.error("❌ There was an issue processing your request")
+                            
+                            # Show reference ID if available
+                            if response.get('reference_id'):
+                                st.info(f"🔖 Reference ID: {response.get('reference_id')}")
                         
                         st.rerun()
 
@@ -322,11 +356,22 @@ def customer_support_page():
             response = requests.get(f"{API_BASE_URL}/analytics", timeout=5)
             if response.status_code == 200:
                 analytics = response.json()
-                st.metric("Total Interactions", analytics.get('total_interactions', 0))
-                st.metric("Resolution Rate", f"{analytics.get('resolution_rate', 0)}%")
-                st.metric("Avg Response Time", f"{analytics.get('avg_response_time', 0)}s")
-        except:
-            st.info("Analytics unavailable")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Interactions", analytics.get('total_interactions', 0))
+                with col2:
+                    st.metric("Resolution Rate", f"{analytics.get('resolution_rate', 0)}%")
+                with col3:
+                    st.metric("Avg Response Time", f"{analytics.get('avg_response_time', 0)}s")
+                
+                # Show customer satisfaction if available
+                if analytics.get('customer_satisfaction'):
+                    st.metric("Customer Satisfaction", f"{analytics.get('customer_satisfaction', 0)}/5 ⭐")
+            else:
+                st.info("📊 Analytics will appear here once you start using the system")
+        except Exception as e:
+            logging.error(f"Analytics error: {e}")
+            st.info("📊 Analytics temporarily unavailable")
 
 def human_agent_page():
     """Human agent dashboard"""
@@ -395,30 +440,41 @@ def human_agent_page():
                             st.rerun()
 
 def main():
-    """Main application"""
+    """Main application entry point"""
+    # Add professional header
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**🚀 Built with:**")
+    st.sidebar.markdown("• LangGraph Agents")
+    st.sidebar.markdown("• Multimodal AI (Gemini)")
+    st.sidebar.markdown("• Human-in-the-Loop")
+    st.sidebar.markdown("• MongoDB Atlas")
+    st.sidebar.markdown("---")
+    
     # Check environment variables first
     required_vars = ["GROQ_API_KEY", "GEMINI_API_KEY", "MONGODB_URI"]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     
     if missing_vars:
-        st.error("❌ Missing required environment variables!")
+        st.error("❌ Configuration Required")
         st.info("Please set these environment variables in Streamlit Cloud settings:")
         for var in missing_vars:
             st.code(f"{var} = your_{var.lower()}_here")
-        st.info("Go to your app settings → Advanced settings → Secrets to add them.")
+        st.info("💡 Go to your app settings → Advanced settings → Secrets to add them.")
         return
     
-    # Start backend
-    with st.spinner("Starting backend services..."):
-        if not start_backend():
-            st.error("❌ Failed to start backend. Please check your setup.")
-            return
+    # Start backend with optimized UX
+    if not st.session_state.backend_started:
+        with st.spinner("🚀 Starting services..."):
+            if not start_backend():
+                st.error("❌ Failed to start services.")
+                st.info("🔄 Please refresh the page.")
+                return
 
     # Navigation
     st.sidebar.title("🛒 CARE System")
     page = st.sidebar.selectbox(
         "Navigate to:",
-        ["Customer Support", "Human Agent Dashboard", "API Status"],
+        ["Customer Support", "Human Agent Dashboard"],
         key="navigation_selector"
     )
 
@@ -426,26 +482,16 @@ def main():
         customer_support_page()
     elif page == "Human Agent Dashboard":
         human_agent_page()
-    elif page == "API Status":
-        st.header("🔧 API Status")
-        try:
-            response = requests.get(f"{API_BASE_URL}/health", timeout=5)
-            if response.status_code == 200:
-                st.success("✅ Backend API is running")
-                st.json(response.json())
-            else:
-                st.error(f"❌ Backend API error: {response.status_code}")
-        except Exception as e:
-            st.error(f"❌ Cannot connect to backend: {e}")
-        
-        st.subheader("🔗 API Endpoints")
-        st.markdown(f"""
-        - **Health Check**: {API_BASE_URL}/health
-        - **API Docs**: {API_BASE_URL}/docs
-        - **Customers**: {API_BASE_URL}/customers
-        - **Chat**: {API_BASE_URL}/chat
-        - **Validate**: {API_BASE_URL}/validate
-        """)
+    
+    # Professional footer
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**💡 About CARE**")
+    st.sidebar.markdown("AI-powered customer support with intelligent resolution and human oversight.")
+    st.sidebar.markdown("**🔧 Features:**")
+    st.sidebar.markdown("• Automated refund processing")
+    st.sidebar.markdown("• Image damage analysis")
+    st.sidebar.markdown("• Smart escalation system")
+    st.sidebar.markdown("• Real-time analytics")
 
 if __name__ == "__main__":
     main()
