@@ -14,23 +14,8 @@ from datetime import datetime
 from PIL import Image
 from io import BytesIO
 import plotly.express as px
-import logging
-
-# Create logs directory if it doesn't exist
-os.makedirs("logs", exist_ok=True)
-
 # Add src to path
 sys.path.append('src')
-
-# Configure logging with proper file path
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler("logs/streamlit_app.log"),
-        logging.StreamHandler()
-    ]
-)
 
 # Page configuration
 st.set_page_config(
@@ -100,10 +85,8 @@ st.markdown("""
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user_info" not in st.session_state:
-    st.session_state.user_info = None
+if "selected_customer" not in st.session_state:
+    st.session_state.selected_customer = None
 if "backend_started" not in st.session_state:
     st.session_state.backend_started = False
 
@@ -122,9 +105,6 @@ def start_backend():
     
     # Start backend in background
     try:
-        # Ensure logs directory exists for backend too
-        os.makedirs("logs", exist_ok=True)
-        
         import uvicorn
         from fast_api import app
         
@@ -137,7 +117,6 @@ def start_backend():
         st.session_state.backend_started = True
         return True
     except Exception as e:
-        logging.error(f"Failed to start backend: {e}")
         st.error(f"Failed to start backend: {e}")
         return False
 
@@ -152,7 +131,6 @@ def get_customers():
         else:
             return []
     except Exception as e:
-        logging.error(f"Error fetching customers: {e}")
         return []
 
 @st.cache_data(ttl=30)  # Cache for 30 seconds
@@ -164,7 +142,6 @@ def get_customer_info(customer_id):
             return response.json()
         return None
     except Exception as e:
-        logging.error(f"Error fetching customer info: {e}")
         return None
 
 def send_message(message, customer_id, file=None):
@@ -198,7 +175,6 @@ def send_message(message, customer_id, file=None):
         st.error("Request timed out. Please try again.")
         return None
     except Exception as e:
-        logging.error(f"Error: {e}")
         st.error("Please try again.")
         return None
 
@@ -211,7 +187,6 @@ def get_escalations():
             return response.json().get('escalations', [])
         return []
     except Exception as e:
-        logging.error(f"Error fetching escalations: {e}")
         return []
 
 def resolve_escalation(case_id, resolution_type, notes):
@@ -231,7 +206,6 @@ def resolve_escalation(case_id, resolution_type, notes):
             return True
         return False
     except Exception as e:
-        logging.error(f"Error resolving case: {e}")
         return False
 
 @st.cache_data(ttl=30)
@@ -243,7 +217,6 @@ def get_subscriptions(customer_id):
             return response.json().get('subscriptions', [])
         return []
     except Exception as e:
-        logging.error(f"Error fetching subscriptions: {e}")
         return []
 
 def create_subscription(customer_id, items, delivery_date, subscription_type):
@@ -263,7 +236,6 @@ def create_subscription(customer_id, items, delivery_date, subscription_type):
             return response.json()
         return None
     except Exception as e:
-        logging.error(f"Error creating subscription: {e}")
         return None
 
 def cancel_subscription(subscription_id):
@@ -275,207 +247,78 @@ def cancel_subscription(subscription_id):
             return True
         return False
     except Exception as e:
-        logging.error(f"Error cancelling subscription: {e}")
         return False
 
-def register_user(name, email, phone, location):
-    """Register a new user"""
-    try:
-        user_data = {
-            "name": name.strip(),
-            "email": email.strip(),
-            "phone": phone.strip(),
-            "location": location.strip(),
-            "join_date": datetime.now().isoformat()
-        }
-        response = requests.post(f"{API_BASE_URL}/register", json=user_data, timeout=5)
-        if response.status_code == 200:
-            return response.json()
-        elif response.status_code == 400:
-            error_detail = response.json().get("detail", "Registration failed")
-            st.error(f"❌ {error_detail}")
-            return None
-        else:
-            st.error("❌ Registration failed. Please try again.")
-            return None
-    except Exception as e:
-        logging.error(f"Error registering user: {e}")
-        st.error("❌ Connection error. Please try again.")
-        return None
 
-def login_user(email, phone):
-    """Login user with email and phone"""
-    try:
-        login_data = {"email": email.strip(), "phone": phone.strip()}
-        response = requests.post(f"{API_BASE_URL}/login", json=login_data, timeout=5)
-        if response.status_code == 200:
-            return response.json()
-        elif response.status_code == 401:
-            error_detail = response.json().get("detail", "Invalid credentials")
-            st.error(f"❌ {error_detail}")
-            return None
-        else:
-            st.error("❌ Login failed. Please try again.")
-            return None
-    except Exception as e:
-        logging.error(f"Error logging in: {e}")
-        st.error("❌ Connection error. Please try again.")
-        return None
 
-def login_page():
-    """User authentication page"""
-    st.markdown("""
-    <div class="main-header">
-        <h1>🛒 Welcome to CARE</h1>
-        <p>Customer Assistance Resolution Engine</p>
-    </div>
-    """, unsafe_allow_html=True)
 
-    # Login/Register tabs
-    tab1, tab2 = st.tabs(["🔑 Login", "📝 Register"])
-    
-    with tab1:
-        st.subheader("Login to Your Account")
-        with st.form("login_form"):
-            email = st.text_input("📧 Email Address", placeholder="priya.sharma@gmail.com")
-            
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                country_code = st.selectbox("🌍", ["+91", "+1", "+44", "+86"], index=0, key="login_country")
-            with col2:
-                phone_number = st.text_input("📱 Phone Number", placeholder="9876543210", label_visibility="collapsed")
-            
-            if st.form_submit_button("🚀 Login", use_container_width=True):
-                if email and phone_number:
-                    full_phone = f"{country_code}-{phone_number}"
-                    with st.spinner("Logging in..."):
-                        user_data = login_user(email, full_phone)
-                        if user_data:
-                            st.session_state.logged_in = True
-                            st.session_state.user_info = user_data
-                            st.success(f"Welcome back, {user_data.get('name', 'User')}!")
-                            st.rerun()
-                        # Error message is handled in login_user function
-                else:
-                    st.error("Please fill in all fields")
-        
-
-    
-    with tab2:
-        st.subheader("Create New Account")
-        with st.form("register_form"):
-            name = st.text_input("👤 Full Name", placeholder="John Doe")
-            email = st.text_input("📧 Email Address", placeholder="john.doe@example.com")
-            
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                country_code_reg = st.selectbox("🌍", ["+91", "+1", "+44", "+86"], index=0, key="register_country")
-            with col2:
-                phone_number_reg = st.text_input("📱 Phone Number", placeholder="9876543210", label_visibility="collapsed")
-            
-            location = st.text_input("📍 Location", placeholder="Mumbai, Maharashtra")
-            
-            if st.form_submit_button("✨ Create Account", use_container_width=True):
-                if name and email and phone_number_reg and location:
-                    full_phone = f"{country_code_reg}-{phone_number_reg}"
-                    with st.spinner("Creating account..."):
-                        user_data = register_user(name, email, full_phone, location)
-                        if user_data:
-                            st.session_state.logged_in = True
-                            st.session_state.user_info = user_data
-                            st.success(f"🎉 Welcome to CARE, {name}!")
-                            st.balloons()
-                            st.rerun()
-                        # Error message is handled in register_user function
-                else:
-                    st.error("Please fill in all fields")
-
-    # Debug section
-    st.markdown("---")
-    with st.expander("🔧 Debug Info"):
-        if st.button("Test Backend Connection"):
-            try:
-                response = requests.get(f"{API_BASE_URL}/health", timeout=5)
-                if response.status_code == 200:
-                    health_data = response.json()
-                    st.success(f"✅ Backend connected! Database: {health_data.get('database')}, Customers: {health_data.get('customers_count')}")
-                else:
-                    st.error(f"❌ Backend error: {response.status_code}")
-            except Exception as e:
-                st.error(f"❌ Connection failed: {e}")
-        
-        if st.button("Show Available Users"):
-            try:
-                response = requests.get(f"{API_BASE_URL}/customers", timeout=5)
-                if response.status_code == 200:
-                    customers = response.json().get('customers', [])
-                    st.write("Available users for testing:")
-                    for c in customers[:3]:  # Show first 3
-                        st.write(f"📧 {c.get('email')} | 📱 {c.get('phone')}")
-                else:
-                    st.error("Failed to fetch customers")
-            except Exception as e:
-                st.error(f"Error: {e}")
 
 def customer_support_page():
     """Main customer support interface"""
-    user = st.session_state.user_info
-    
-    st.markdown(f"""
-    <div class="main-header">
-        <h1>🛒 Welcome, {user.get('name', 'User')}!</h1>
-        <p>How can we help you today?</p>
-    </div>
-    """, unsafe_allow_html=True)
 
-    customer_id = user.get('customer_id')
+    # Customer selection
+    customers = get_customers()
+    if not customers:
+        st.error("No customers found. Please check backend connection.")
+        return
     
-    # Sidebar with user info and quick actions
+    # Sidebar with customer selection and quick actions
     with st.sidebar:
-        st.header("👤 Your Account")
-        st.markdown(f"""
-        <div class="customer-info">
-            <strong>Name:</strong> {user.get('name', 'N/A')}<br>
-            <strong>Email:</strong> {user.get('email', 'N/A')}<br>
-            <strong>Phone:</strong> {user.get('phone', 'N/A')}<br>
-            <strong>Location:</strong> {user.get('location', 'N/A')}<br>
-            <strong>Wallet:</strong> ₹{user.get('wallet_balance', 0)}<br>
-            <strong>Membership:</strong> {user.get('membership', 'Regular')}
-        </div>
-        """, unsafe_allow_html=True)
+        st.header("👤 Select Customer")
+        customer_options = [f"{c.get('name', 'Unknown')} ({c.get('customer_id', 'N/A')})" for c in customers]
+        selected_idx = st.selectbox(
+            "Choose a customer:",
+            range(len(customer_options)),
+            format_func=lambda x: customer_options[x],
+            key="customer_selector"
+        )
         
-        if st.button("🚪 Logout", use_container_width=True):
-            st.session_state.logged_in = False
-            st.session_state.user_info = None
-            st.session_state.messages = []
-            st.rerun()
-
-        # Quick scenarios
-        st.header("🚀 Quick Actions")
-        scenarios = [
-            "I want to check my recent orders",
-            "I need help with a refund",
-            "My payment failed",
-            "Check my wallet balance",
-            "I want to track my delivery"
-        ]
-        for idx, scenario in enumerate(scenarios):
-            if st.button(scenario, key=f"scenario_{idx}_{hash(scenario)}"):
-                response = send_message(scenario, customer_id)
-                if response:
-                    st.session_state.messages.append({
-                        "role": "user",
-                        "content": scenario,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": response.get('response', 'Processing...'),
-                        "intent": response.get('intent', 'None'),
-                        "status": response.get('status', 'Processing'),
-                        "timestamp": datetime.now().isoformat()
-                    })
-                    st.rerun()
+        if selected_idx is not None:
+            selected_customer = customers[selected_idx]
+            st.session_state.selected_customer = selected_customer
+            customer_id = selected_customer.get('customer_id')
+            
+            # Display customer info
+            st.markdown(f"""
+            <div class="customer-info">
+                <strong>Name:</strong> {selected_customer.get('name', 'N/A')}<br>
+                <strong>ID:</strong> {selected_customer.get('customer_id', 'N/A')}<br>
+                <strong>Email:</strong> {selected_customer.get('email', 'N/A')}<br>
+                <strong>Phone:</strong> {selected_customer.get('phone', 'N/A')}<br>
+                <strong>Location:</strong> {selected_customer.get('location', 'N/A')}<br>
+                <strong>Wallet:</strong> ₹{selected_customer.get('wallet_balance', 0)}<br>
+                <strong>Membership:</strong> {selected_customer.get('membership', 'Regular')}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Quick scenarios
+            st.header("🚀 Quick Actions")
+            scenarios = [
+                "I want to check my recent orders",
+                "I need help with a refund",
+                "My payment failed",
+                "Check my wallet balance",
+                "I want to track my delivery"
+            ]
+            for idx, scenario in enumerate(scenarios):
+                if st.button(scenario, key=f"scenario_{idx}_{hash(scenario)}"):
+                    response = send_message(scenario, customer_id)
+                    if response:
+                        st.session_state.messages.append({
+                            "role": "user",
+                            "content": scenario,
+                            "timestamp": datetime.now().isoformat()
+                        })
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": response.get('response', 'Processing...'),
+                            "intent": response.get('intent', 'None'),
+                            "status": response.get('status', 'Processing'),
+                            "timestamp": datetime.now().isoformat()
+                        })
+                        st.rerun()
+        else:
+            customer_id = None
 
     # Main content
     col1, col2 = st.columns([2, 1])
@@ -484,7 +327,7 @@ def customer_support_page():
         st.header("💬 Chat Support")
         
         if not customer_id:
-            st.info("Please select a customer to start chatting.")
+            st.info("Please select a customer from the sidebar to start chatting.")
         else:
             # Display chat history
             for message in st.session_state.messages:
@@ -546,22 +389,20 @@ def customer_support_page():
                         st.rerun()
 
     with col2:
-        # Customer info
-        if customer_id:
-            customer_info = get_customer_info(customer_id)
-            if customer_info:
-                customer = customer_info.get('customer', {})
-                st.header("👤 Customer Info")
-                st.markdown(f"""
-                <div class="customer-info">
-                    <strong>Name:</strong> {customer.get('name', 'N/A')}<br>
-                    <strong>ID:</strong> {customer.get('customer_id', 'N/A')}<br>
-                    <strong>Email:</strong> {customer.get('email', 'N/A')}<br>
-                    <strong>Wallet:</strong> ₹{customer.get('wallet_balance', 0)}<br>
-                    <strong>Membership:</strong> {customer.get('membership', 'N/A')}<br>
-                    <strong>Location:</strong> {customer.get('location', 'N/A')}
-                </div>
-                """, unsafe_allow_html=True)
+        # Customer details
+        if customer_id and st.session_state.selected_customer:
+            customer = st.session_state.selected_customer
+            st.header("👤 Customer Details")
+            st.markdown(f"""
+            <div class="customer-info">
+                <strong>Name:</strong> {customer.get('name', 'N/A')}<br>
+                <strong>ID:</strong> {customer.get('customer_id', 'N/A')}<br>
+                <strong>Email:</strong> {customer.get('email', 'N/A')}<br>
+                <strong>Wallet:</strong> ₹{customer.get('wallet_balance', 0)}<br>
+                <strong>Membership:</strong> {customer.get('membership', 'N/A')}<br>
+                <strong>Location:</strong> {customer.get('location', 'N/A')}
+            </div>
+            """, unsafe_allow_html=True)
 
         # Enhanced stats display
         st.header("📊 System Analytics")
@@ -606,20 +447,44 @@ def customer_support_page():
                 </div>
                 """, unsafe_allow_html=True)
         except Exception as e:
-            logging.error(f"Analytics error: {e}")
             st.info("📊 Analytics loading...")
 
 def subscription_page():
     """Subscription management page"""
-    user = st.session_state.user_info
-    customer_id = user.get('customer_id')
+    st.subheader("📦 Subscription Manager")
     
-    st.markdown(f"""
-    <div class="main-header">
-        <h1>📦 Your Subscriptions</h1>
-        <p>Manage your recurring deliveries, {user.get('name', 'User')}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Customer selection in sidebar
+    customers = get_customers()
+    if not customers:
+        st.error("No customers found. Please check backend connection.")
+        return
+    
+    with st.sidebar:
+        st.header("👤 Select Customer")
+        customer_options = [f"{c.get('name', 'Unknown')} ({c.get('customer_id', 'N/A')})" for c in customers]
+        selected_idx = st.selectbox(
+            "Choose a customer:",
+            range(len(customer_options)),
+            format_func=lambda x: customer_options[x],
+            key="subscription_customer_selector"
+        )
+        
+        if selected_idx is not None:
+            customer = customers[selected_idx]
+            customer_id = customer.get('customer_id')
+            
+            # Display customer info
+            st.markdown(f"""
+            <div class="customer-info">
+                <strong>Name:</strong> {customer.get('name', 'N/A')}<br>
+                <strong>ID:</strong> {customer.get('customer_id', 'N/A')}<br>
+                <strong>Email:</strong> {customer.get('email', 'N/A')}<br>
+                <strong>Wallet:</strong> ₹{customer.get('wallet_balance', 0)}
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("Please select a customer to manage subscriptions.")
+            return
 
     # Two columns layout
     col1, col2 = st.columns([1, 1])
@@ -712,12 +577,7 @@ def subscription_page():
 
 def human_agent_page():
     """Human agent dashboard"""
-    st.markdown("""
-    <div class="main-header">
-        <h1>👨‍💼 Human Agent Dashboard</h1>
-        <p>Review and resolve escalated customer cases</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.subheader("👨‍💼 Human Agent Dashboard")
 
     # Get escalations with error handling
     try:
@@ -799,12 +659,15 @@ def main():
                 st.info("🔄 Please refresh the page.")
                 return
 
-    # Check if user is logged in
-    if not st.session_state.logged_in:
-        login_page()
-        return
-
-    # Navigation for logged-in users
+    # Main header
+    st.markdown("""
+    <div class="main-header">
+        <h1>🛒 CARE: Customer Assistance Resolution Engine</h1>
+        <p>AI-powered customer support system with intelligent resolution capabilities</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Navigation
     st.sidebar.title("🛒 CARE System")
     page = st.sidebar.selectbox(
         "Navigate to:",
