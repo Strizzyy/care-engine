@@ -308,22 +308,39 @@ async def resolve_escalation(case_id: str, resolution: dict):
 @app.post("/register")
 async def register_user(user_data: dict):
     try:
-        logging.info(f"Registering new user: {user_data.get('email')}")
+        email = user_data.get('email')
+        logging.info(f"Registering new user: {email}")
         
-        # Generate customer ID
+        # Check if user already exists
+        existing_user = await data_handler.collections["customers"].find_one({
+            "$or": [
+                {"email": email},
+                {"phone": user_data.get("phone")}
+            ]
+        })
+        
+        if existing_user:
+            logging.warning(f"User already exists: {email}")
+            raise HTTPException(status_code=400, detail="User with this email or phone already exists")
+        
+        # Generate unique customer ID
         import random
-        customer_id = f"WM{random.randint(100, 999)}"
+        while True:
+            customer_id = f"WM{random.randint(100, 999)}"
+            existing_id = await data_handler.collections["customers"].find_one({"customer_id": customer_id})
+            if not existing_id:
+                break
         
         # Create customer record
         customer = {
             "customer_id": customer_id,
             "name": user_data.get("name"),
-            "email": user_data.get("email"),
+            "email": email,
             "phone": user_data.get("phone"),
             "wallet_balance": 0.0,
             "membership": "Regular",
             "location": user_data.get("location"),
-            "join_date": user_data.get("join_date"),
+            "join_date": user_data.get("join_date", datetime.now().isoformat()),
             "total_spent": 0.0,
             "recent_orders": [],
             "preferred_language": "English"
@@ -332,9 +349,14 @@ async def register_user(user_data: dict):
         # Add to database
         await data_handler.collections["customers"].insert_one(customer)
         
+        # Convert ObjectId for response
+        customer = data_handler._convert_objectid(customer)
+        
         logging.info(f"User registered successfully: {customer_id}")
         return customer
         
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error(f"Error in register_user: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -342,14 +364,17 @@ async def register_user(user_data: dict):
 @app.post("/login")
 async def login_user(login_data: dict):
     try:
-        email = login_data.get("email")
-        phone = login_data.get("phone")
+        email = login_data.get("email", "").strip().lower()
+        phone = login_data.get("phone", "").strip()
         
-        logging.info(f"Login attempt for email: {email}")
+        logging.info(f"Login attempt for email: {email}, phone: {phone}")
         
-        # Find user by email and phone
+        if not email or not phone:
+            raise HTTPException(status_code=400, detail="Email and phone are required")
+        
+        # Find user by email and phone (case-insensitive email)
         customer = await data_handler.collections["customers"].find_one({
-            "email": email,
+            "email": {"$regex": f"^{email}$", "$options": "i"},
             "phone": phone
         })
         
@@ -359,8 +384,17 @@ async def login_user(login_data: dict):
             logging.info(f"Login successful for: {customer['customer_id']}")
             return customer
         else:
-            logging.warning(f"Login failed for email: {email}")
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+            # Try to find by email only to give better error message
+            email_exists = await data_handler.collections["customers"].find_one({
+                "email": {"$regex": f"^{email}$", "$options": "i"}
+            })
+            
+            if email_exists:
+                logging.warning(f"Login failed - wrong phone for email: {email}")
+                raise HTTPException(status_code=401, detail="Invalid phone number for this email")
+            else:
+                logging.warning(f"Login failed - email not found: {email}")
+                raise HTTPException(status_code=401, detail="Email not found. Please register first.")
             
     except HTTPException:
         raise

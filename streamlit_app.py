@@ -282,33 +282,44 @@ def register_user(name, email, phone, location):
     """Register a new user"""
     try:
         user_data = {
-            "name": name,
-            "email": email,
-            "phone": phone,
-            "location": location,
-            "membership": "Regular",
-            "wallet_balance": 0.0,
-            "total_spent": 0.0,
+            "name": name.strip(),
+            "email": email.strip(),
+            "phone": phone.strip(),
+            "location": location.strip(),
             "join_date": datetime.now().isoformat()
         }
         response = requests.post(f"{API_BASE_URL}/register", json=user_data, timeout=5)
         if response.status_code == 200:
             return response.json()
-        return None
+        elif response.status_code == 400:
+            error_detail = response.json().get("detail", "Registration failed")
+            st.error(f"❌ {error_detail}")
+            return None
+        else:
+            st.error("❌ Registration failed. Please try again.")
+            return None
     except Exception as e:
         logging.error(f"Error registering user: {e}")
+        st.error("❌ Connection error. Please try again.")
         return None
 
 def login_user(email, phone):
     """Login user with email and phone"""
     try:
-        login_data = {"email": email, "phone": phone}
+        login_data = {"email": email.strip(), "phone": phone.strip()}
         response = requests.post(f"{API_BASE_URL}/login", json=login_data, timeout=5)
         if response.status_code == 200:
             return response.json()
-        return None
+        elif response.status_code == 401:
+            error_detail = response.json().get("detail", "Invalid credentials")
+            st.error(f"❌ {error_detail}")
+            return None
+        else:
+            st.error("❌ Login failed. Please try again.")
+            return None
     except Exception as e:
         logging.error(f"Error logging in: {e}")
+        st.error("❌ Connection error. Please try again.")
         return None
 
 def login_page():
@@ -326,43 +337,57 @@ def login_page():
     with tab1:
         st.subheader("Login to Your Account")
         with st.form("login_form"):
-            email = st.text_input("📧 Email Address", placeholder="your.email@example.com")
-            phone = st.text_input("📱 Phone Number", placeholder="+91-9876543210")
+            email = st.text_input("📧 Email Address", placeholder="priya.sharma@gmail.com")
+            
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                country_code = st.selectbox("🌍", ["+91", "+1", "+44", "+86"], index=0, key="login_country")
+            with col2:
+                phone_number = st.text_input("📱 Phone Number", placeholder="9876543210", label_visibility="collapsed")
             
             if st.form_submit_button("🚀 Login", use_container_width=True):
-                if email and phone:
+                if email and phone_number:
+                    full_phone = f"{country_code}-{phone_number}"
                     with st.spinner("Logging in..."):
-                        user_data = login_user(email, phone)
+                        user_data = login_user(email, full_phone)
                         if user_data:
                             st.session_state.logged_in = True
                             st.session_state.user_info = user_data
                             st.success(f"Welcome back, {user_data.get('name', 'User')}!")
                             st.rerun()
-                        else:
-                            st.error("❌ Invalid credentials. Please check your email and phone number.")
+                        # Error message is handled in login_user function
                 else:
                     st.error("Please fill in all fields")
+        
+        # Demo credentials helper
+        st.info("💡 **Try Demo Login:**\n\nEmail: priya.sharma@gmail.com\nPhone: 9876543210")
     
     with tab2:
         st.subheader("Create New Account")
         with st.form("register_form"):
             name = st.text_input("👤 Full Name", placeholder="John Doe")
             email = st.text_input("📧 Email Address", placeholder="john.doe@example.com")
-            phone = st.text_input("📱 Phone Number", placeholder="+91-9876543210")
+            
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                country_code_reg = st.selectbox("🌍", ["+91", "+1", "+44", "+86"], index=0, key="register_country")
+            with col2:
+                phone_number_reg = st.text_input("📱 Phone Number", placeholder="9876543210", label_visibility="collapsed")
+            
             location = st.text_input("📍 Location", placeholder="Mumbai, Maharashtra")
             
             if st.form_submit_button("✨ Create Account", use_container_width=True):
-                if name and email and phone and location:
+                if name and email and phone_number_reg and location:
+                    full_phone = f"{country_code_reg}-{phone_number_reg}"
                     with st.spinner("Creating account..."):
-                        user_data = register_user(name, email, phone, location)
+                        user_data = register_user(name, email, full_phone, location)
                         if user_data:
                             st.session_state.logged_in = True
                             st.session_state.user_info = user_data
                             st.success(f"🎉 Welcome to CARE, {name}!")
                             st.balloons()
                             st.rerun()
-                        else:
-                            st.error("❌ Registration failed. Please try again.")
+                        # Error message is handled in register_user function
                 else:
                     st.error("Please fill in all fields")
 
