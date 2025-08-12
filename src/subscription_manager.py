@@ -5,10 +5,16 @@ import logging
 from data_handler import MongoDBHandler
 
 # Configure logging
+import os
+os.makedirs("logs", exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler("logs/subscription_manager.log"), logging.StreamHandler()]
+    handlers=[
+        logging.FileHandler("logs/subscription_manager.log", mode='a'),
+        logging.StreamHandler()
+    ]
 )
 
 class SubscriptionManager:

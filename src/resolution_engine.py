@@ -11,10 +11,17 @@ import google.generativeai as genai
 from langgraph.graph import StateGraph, END
 from typing import TypedDict, Literal
 
+# Ensure logs directory exists
+import os
+os.makedirs("logs", exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler("logs/resolution_engine.log"), logging.StreamHandler()]
+    handlers=[
+        logging.FileHandler("logs/resolution_engine.log", mode='a'),
+        logging.StreamHandler()
+    ]
 )
 
 class AgentState(TypedDict):

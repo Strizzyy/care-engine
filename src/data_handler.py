@@ -4,10 +4,16 @@ from datetime import datetime
 import logging
 
 # Configure logging
+import os
+os.makedirs("logs", exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler("logs/data_handler.log"), logging.StreamHandler()]
+    handlers=[
+        logging.FileHandler("logs/data_handler.log", mode='a'),
+        logging.StreamHandler()
+    ]
 )
 
 class MongoDBHandler:

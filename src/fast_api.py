@@ -16,11 +16,17 @@ import os
 # Ensure logs directory exists
 os.makedirs("logs", exist_ok=True)
 
+# Ensure logs directory exists
+os.makedirs("logs", exist_ok=True)
+
 # Logging setup
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler("logs/care_api.log"), logging.StreamHandler()]
+    handlers=[
+        logging.FileHandler("logs/care_api.log", mode='a'),
+        logging.StreamHandler()
+    ]
 )
 
 app = FastAPI(title="CARE API")

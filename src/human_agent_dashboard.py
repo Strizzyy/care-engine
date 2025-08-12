@@ -10,10 +10,24 @@ import base64
 from PIL import Image
 from io import BytesIO
 import os
+import logging
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Ensure logs directory exists
+os.makedirs("logs", exist_ok=True)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("logs/human_agent_dashboard.log", mode='a'),
+        logging.StreamHandler()
+    ]
+)
 # Determine API base URL based on environment
 if os.getenv("SPACE_ID"):  # Running on Hugging Face Spaces
     API_BASE_URL = "http://localhost:7860"  # Internal communication
