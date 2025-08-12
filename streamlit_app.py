@@ -337,8 +337,12 @@ def human_agent_page():
     </div>
     """, unsafe_allow_html=True)
 
-    # Get escalations
-    escalations = get_escalations()
+    # Get escalations with error handling
+    try:
+        escalations = get_escalations()
+    except Exception as e:
+        st.error(f"Error loading escalations: {e}")
+        escalations = []
     
     if not escalations:
         st.success("🎉 No escalated cases! All customers are happy.")
@@ -360,29 +364,32 @@ def human_agent_page():
     # Pending cases
     if pending_cases:
         st.subheader("🚨 Pending Cases")
-        for case in pending_cases:
-            case_id = case.get('case_id', 'Unknown')
+        for idx, case in enumerate(pending_cases):
+            case_id = case.get('case_id', f'Unknown_{idx}')
             customer_id = case.get('customer_id', 'Unknown')
             issue_details = case.get('issue_details', 'No details')
             
-            with st.expander(f"Case {case_id} - Customer {customer_id}", key=f"expander_{case_id}"):
-                st.text_area("Issue Details", value=issue_details, height=100, disabled=True, key=f"details_{case_id}")
+            # Create unique identifier for this case
+            unique_id = f"{case_id}_{idx}"
+            
+            with st.expander(f"Case {case_id} - Customer {customer_id}"):
+                st.text_area("Issue Details", value=issue_details, height=100, disabled=True, key=f"details_{unique_id}")
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    if st.button(f"✅ Approve", key=f"approve_{case_id}"):
+                    if st.button(f"✅ Approve", key=f"approve_{unique_id}"):
                         if resolve_escalation(case_id, "approved", "Approved by human agent"):
                             st.success("Case approved!")
                             st.rerun()
                 
                 with col2:
-                    if st.button(f"❌ Reject", key=f"reject_{case_id}"):
+                    if st.button(f"❌ Reject", key=f"reject_{unique_id}"):
                         if resolve_escalation(case_id, "rejected", "Rejected after review"):
                             st.success("Case rejected!")
                             st.rerun()
                 
                 with col3:
-                    if st.button(f"📞 Contact", key=f"contact_{case_id}"):
+                    if st.button(f"📞 Contact", key=f"contact_{unique_id}"):
                         if resolve_escalation(case_id, "contact_required", "Customer contact needed"):
                             st.success("Marked for contact!")
                             st.rerun()
