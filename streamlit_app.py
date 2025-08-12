@@ -43,30 +43,56 @@ st.set_page_config(
 # Environment setup
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:7860")
 
-# Custom CSS
+# Enhanced CSS for better UI
 st.markdown("""
 <style>
     .main-header {
         background: linear-gradient(135deg, #0078d4 0%, #005a9e 100%);
         color: white;
         padding: 2rem;
-        border-radius: 12px;
+        border-radius: 15px;
         margin-bottom: 2rem;
         text-align: center;
+        box-shadow: 0 4px 15px rgba(0,120,212,0.3);
     }
     .customer-info {
-        background: #f8f9fa;
+        background: linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%);
         padding: 1.5rem;
-        border-radius: 12px;
+        border-radius: 15px;
         border-left: 6px solid #0078d4;
         margin-bottom: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease;
+    }
+    .customer-info:hover {
+        transform: translateY(-2px);
     }
     .escalation-card {
-        background: #fff3cd;
+        background: linear-gradient(145deg, #fff3cd 0%, #ffeaa7 100%);
         padding: 1rem;
-        border-radius: 8px;
+        border-radius: 12px;
         border-left: 4px solid #ffc107;
         margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(255,193,7,0.2);
+    }
+    .metric-container {
+        background: white;
+        padding: 1rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+    .stSelectbox > div > div {
+        background-color: white;
+        border-radius: 8px;
+    }
+    .stButton > button {
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -74,8 +100,10 @@ st.markdown("""
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "selected_customer" not in st.session_state:
-    st.session_state.selected_customer = None
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "user_info" not in st.session_state:
+    st.session_state.user_info = None
 if "backend_started" not in st.session_state:
     st.session_state.backend_started = False
 
@@ -206,63 +234,201 @@ def resolve_escalation(case_id, resolution_type, notes):
         logging.error(f"Error resolving case: {e}")
         return False
 
-def customer_support_page():
-    """Main customer support interface"""
+@st.cache_data(ttl=30)
+def get_subscriptions(customer_id):
+    """Get customer subscriptions with caching"""
+    try:
+        response = requests.get(f"{API_BASE_URL}/subscriptions/{customer_id}", timeout=3)
+        if response.status_code == 200:
+            return response.json().get('subscriptions', [])
+        return []
+    except Exception as e:
+        logging.error(f"Error fetching subscriptions: {e}")
+        return []
+
+def create_subscription(customer_id, items, delivery_date, subscription_type):
+    """Create a new subscription"""
+    try:
+        subscription_data = {
+            "customer_id": customer_id,
+            "items": items,
+            "delivery_date": delivery_date,
+            "subscription_type": subscription_type
+        }
+        response = requests.post(f"{API_BASE_URL}/subscription", 
+                               json=subscription_data, timeout=5)
+        if response.status_code == 200:
+            # Clear cache to show new subscription
+            get_subscriptions.clear()
+            return response.json()
+        return None
+    except Exception as e:
+        logging.error(f"Error creating subscription: {e}")
+        return None
+
+def cancel_subscription(subscription_id):
+    """Cancel a subscription"""
+    try:
+        response = requests.post(f"{API_BASE_URL}/subscription/cancel/{subscription_id}", timeout=5)
+        if response.status_code == 200:
+            get_subscriptions.clear()
+            return True
+        return False
+    except Exception as e:
+        logging.error(f"Error cancelling subscription: {e}")
+        return False
+
+def register_user(name, email, phone, location):
+    """Register a new user"""
+    try:
+        user_data = {
+            "name": name,
+            "email": email,
+            "phone": phone,
+            "location": location,
+            "membership": "Regular",
+            "wallet_balance": 0.0,
+            "total_spent": 0.0,
+            "join_date": datetime.now().isoformat()
+        }
+        response = requests.post(f"{API_BASE_URL}/register", json=user_data, timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception as e:
+        logging.error(f"Error registering user: {e}")
+        return None
+
+def login_user(email, phone):
+    """Login user with email and phone"""
+    try:
+        login_data = {"email": email, "phone": phone}
+        response = requests.post(f"{API_BASE_URL}/login", json=login_data, timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception as e:
+        logging.error(f"Error logging in: {e}")
+        return None
+
+def login_page():
+    """User authentication page"""
     st.markdown("""
     <div class="main-header">
-        <h1>🛒 CARE: Customer Assistance Resolution Engine</h1>
-        <p>AI-powered customer support with intelligent resolution</p>
+        <h1>🛒 Welcome to CARE</h1>
+        <p>Customer Assistance Resolution Engine</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # Sidebar for customer selection
-    with st.sidebar:
-        st.header("👤 Customer Selection")
-        customers = get_customers()
-        
-        if customers:
-            customer_options = {f"{c['name']} ({c['customer_id']})": c['customer_id'] for c in customers}
-            selected_customer = st.selectbox(
-                "Select Customer",
-                options=list(customer_options.keys()),
-                index=0 if customer_options else None,
-                key="customer_selector"
-            )
-            customer_id = customer_options.get(selected_customer)
+    # Login/Register tabs
+    tab1, tab2 = st.tabs(["🔑 Login", "📝 Register"])
+    
+    with tab1:
+        st.subheader("Login to Your Account")
+        with st.form("login_form"):
+            email = st.text_input("📧 Email Address", placeholder="your.email@example.com")
+            phone = st.text_input("📱 Phone Number", placeholder="+91-9876543210")
             
-            if customer_id != st.session_state.selected_customer:
-                st.session_state.selected_customer = customer_id
-                st.session_state.messages = []
-        else:
-            st.warning("No customers available. Starting backend...")
-            customer_id = None
+            if st.form_submit_button("🚀 Login", use_container_width=True):
+                if email and phone:
+                    with st.spinner("Logging in..."):
+                        user_data = login_user(email, phone)
+                        if user_data:
+                            st.session_state.logged_in = True
+                            st.session_state.user_info = user_data
+                            st.success(f"Welcome back, {user_data.get('name', 'User')}!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Invalid credentials. Please check your email and phone number.")
+                else:
+                    st.error("Please fill in all fields")
+    
+    with tab2:
+        st.subheader("Create New Account")
+        with st.form("register_form"):
+            name = st.text_input("👤 Full Name", placeholder="John Doe")
+            email = st.text_input("📧 Email Address", placeholder="john.doe@example.com")
+            phone = st.text_input("📱 Phone Number", placeholder="+91-9876543210")
+            location = st.text_input("📍 Location", placeholder="Mumbai, Maharashtra")
+            
+            if st.form_submit_button("✨ Create Account", use_container_width=True):
+                if name and email and phone and location:
+                    with st.spinner("Creating account..."):
+                        user_data = register_user(name, email, phone, location)
+                        if user_data:
+                            st.session_state.logged_in = True
+                            st.session_state.user_info = user_data
+                            st.success(f"🎉 Welcome to CARE, {name}!")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.error("❌ Registration failed. Please try again.")
+                else:
+                    st.error("Please fill in all fields")
+
+    # Demo section
+    st.markdown("---")
+    st.info("💡 **Demo Users**: You can also try with existing demo accounts from the customer list")
+
+def customer_support_page():
+    """Main customer support interface"""
+    user = st.session_state.user_info
+    
+    st.markdown(f"""
+    <div class="main-header">
+        <h1>🛒 Welcome, {user.get('name', 'User')}!</h1>
+        <p>How can we help you today?</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    customer_id = user.get('customer_id')
+    
+    # Sidebar with user info and quick actions
+    with st.sidebar:
+        st.header("👤 Your Account")
+        st.markdown(f"""
+        <div class="customer-info">
+            <strong>Name:</strong> {user.get('name', 'N/A')}<br>
+            <strong>Email:</strong> {user.get('email', 'N/A')}<br>
+            <strong>Phone:</strong> {user.get('phone', 'N/A')}<br>
+            <strong>Location:</strong> {user.get('location', 'N/A')}<br>
+            <strong>Wallet:</strong> ₹{user.get('wallet_balance', 0)}<br>
+            <strong>Membership:</strong> {user.get('membership', 'Regular')}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.user_info = None
+            st.session_state.messages = []
+            st.rerun()
 
         # Quick scenarios
-        if customer_id:
-            st.header("🚀 Quick Scenarios")
-            scenarios = [
-                "I want a refund for order ORD001",
-                "Where is my order ORD002?",
-                "My payment failed",
-                "My wallet balance shows ₹0"
-            ]
-            for idx, scenario in enumerate(scenarios):
-                if st.button(scenario, key=f"scenario_{idx}_{hash(scenario)}"):
-                    response = send_message(scenario, customer_id)
-                    if response:
-                        st.session_state.messages.append({
-                            "role": "user",
-                            "content": scenario,
-                            "timestamp": datetime.now().isoformat()
-                        })
-                        st.session_state.messages.append({
-                            "role": "assistant",
-                            "content": response.get('response', 'Processing...'),
-                            "intent": response.get('intent', 'None'),
-                            "status": response.get('status', 'Processing'),
-                            "timestamp": datetime.now().isoformat()
-                        })
-                        st.rerun()
+        st.header("🚀 Quick Actions")
+        scenarios = [
+            "I want to check my recent orders",
+            "I need help with a refund",
+            "My payment failed",
+            "Check my wallet balance",
+            "I want to track my delivery"
+        ]
+        for idx, scenario in enumerate(scenarios):
+            if st.button(scenario, key=f"scenario_{idx}_{hash(scenario)}"):
+                response = send_message(scenario, customer_id)
+                if response:
+                    st.session_state.messages.append({
+                        "role": "user",
+                        "content": scenario,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": response.get('response', 'Processing...'),
+                        "intent": response.get('intent', 'None'),
+                        "status": response.get('status', 'Processing'),
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    st.rerun()
 
     # Main content
     col1, col2 = st.columns([2, 1])
@@ -350,28 +516,152 @@ def customer_support_page():
                 </div>
                 """, unsafe_allow_html=True)
 
-        # Quick stats
-        st.header("📊 Quick Stats")
+        # Enhanced stats display
+        st.header("📊 System Analytics")
         try:
             response = requests.get(f"{API_BASE_URL}/analytics", timeout=5)
             if response.status_code == 200:
                 analytics = response.json()
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Interactions", analytics.get('total_interactions', 0))
-                with col2:
-                    st.metric("Resolution Rate", f"{analytics.get('resolution_rate', 0)}%")
-                with col3:
-                    st.metric("Avg Response Time", f"{analytics.get('avg_response_time', 0)}s")
                 
-                # Show customer satisfaction if available
-                if analytics.get('customer_satisfaction'):
-                    st.metric("Customer Satisfaction", f"{analytics.get('customer_satisfaction', 0)}/5 ⭐")
+                # Main metrics in cards
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("""
+                    <div class="metric-container">
+                        <h4>🔢 Total Interactions</h4>
+                        <h2 style="color: #0078d4;">{}</h2>
+                    </div>
+                    """.format(analytics.get('total_interactions', 0)), unsafe_allow_html=True)
+                    
+                with col2:
+                    st.markdown("""
+                    <div class="metric-container">
+                        <h4>✅ Resolution Rate</h4>
+                        <h2 style="color: #22c55e;">{}%</h2>
+                    </div>
+                    """.format(analytics.get('resolution_rate', 0)), unsafe_allow_html=True)
+                
+                # Additional metrics
+                col3, col4 = st.columns(2)
+                with col3:
+                    st.metric("⚡ Avg Response", f"{analytics.get('avg_response_time', 0)}s")
+                with col4:
+                    if analytics.get('customer_satisfaction'):
+                        st.metric("⭐ Satisfaction", f"{analytics.get('customer_satisfaction', 0)}/5")
+                    else:
+                        st.metric("🎯 System Status", "Active")
+                        
             else:
-                st.info("📊 Analytics will appear here once you start using the system")
+                st.markdown("""
+                <div class="metric-container">
+                    <h4>📊 Analytics Dashboard</h4>
+                    <p>Start using the system to see analytics here</p>
+                </div>
+                """, unsafe_allow_html=True)
         except Exception as e:
             logging.error(f"Analytics error: {e}")
-            st.info("📊 Analytics temporarily unavailable")
+            st.info("📊 Analytics loading...")
+
+def subscription_page():
+    """Subscription management page"""
+    user = st.session_state.user_info
+    customer_id = user.get('customer_id')
+    
+    st.markdown(f"""
+    <div class="main-header">
+        <h1>📦 Your Subscriptions</h1>
+        <p>Manage your recurring deliveries, {user.get('name', 'User')}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Two columns layout
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.subheader("📋 Active Subscriptions")
+        subscriptions = get_subscriptions(customer_id)
+        
+        if subscriptions:
+            for sub in subscriptions:
+                if sub.get('status') == 'active':
+                    with st.container():
+                        st.markdown(f"""
+                        <div class="customer-info">
+                            <strong>🆔 ID:</strong> {sub.get('subscription_id', 'N/A')}<br>
+                            <strong>📦 Items:</strong> {len(sub.get('items', []))} items<br>
+                            <strong>📅 Delivery:</strong> {sub.get('delivery_date', 'N/A')}<br>
+                            <strong>🔄 Type:</strong> {sub.get('subscription_type', 'weekly').title()}<br>
+                            <strong>📊 Status:</strong> {sub.get('status', 'unknown').title()}
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        if st.button(f"❌ Cancel {sub.get('subscription_id')}", 
+                                   key=f"cancel_{sub.get('subscription_id')}"):
+                            if cancel_subscription(sub.get('subscription_id')):
+                                st.success("Subscription cancelled!")
+                                st.rerun()
+                            else:
+                                st.error("Failed to cancel subscription")
+        else:
+            st.info("No active subscriptions found.")
+
+    with col2:
+        st.subheader("➕ Create New Subscription")
+        
+        with st.form("subscription_form"):
+            # Available items
+            available_items = [
+                {"name": "Amul Milk 1L", "price": 60.0},
+                {"name": "Fresh Vegetables Bundle", "price": 300.0},
+                {"name": "Basmati Rice 5kg", "price": 450.0},
+                {"name": "Fortune Oil 1L", "price": 180.0},
+                {"name": "Tide Detergent 1kg", "price": 250.0},
+                {"name": "Britannia Biscuits", "price": 150.0}
+            ]
+            
+            selected_items = st.multiselect(
+                "Select Items",
+                options=[f"{item['name']} - ₹{item['price']}" for item in available_items],
+                key="subscription_items"
+            )
+            
+            delivery_date = st.date_input(
+                "Next Delivery Date",
+                value=datetime.now().date(),
+                key="delivery_date"
+            )
+            
+            subscription_type = st.selectbox(
+                "Subscription Type",
+                options=["weekly", "monthly"],
+                key="subscription_type"
+            )
+            
+            if st.form_submit_button("🚀 Create Subscription"):
+                if selected_items:
+                    # Parse selected items
+                    items = []
+                    for item_str in selected_items:
+                        for item in available_items:
+                            if item_str.startswith(item['name']):
+                                items.append(item)
+                                break
+                    
+                    result = create_subscription(
+                        customer_id, 
+                        items, 
+                        delivery_date.isoformat(), 
+                        subscription_type
+                    )
+                    
+                    if result:
+                        st.success(f"✅ Subscription created! ID: {result.get('subscription_id')}")
+                        st.balloons()
+                        st.rerun()
+                    else:
+                        st.error("Failed to create subscription")
+                else:
+                    st.error("Please select at least one item")
 
 def human_agent_page():
     """Human agent dashboard"""
@@ -441,14 +731,6 @@ def human_agent_page():
 
 def main():
     """Main application entry point"""
-    # Add professional header
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**🚀 Built with:**")
-    st.sidebar.markdown("• LangGraph Agents")
-    st.sidebar.markdown("• Multimodal AI (Gemini)")
-    st.sidebar.markdown("• Human-in-the-Loop")
-    st.sidebar.markdown("• MongoDB Atlas")
-    st.sidebar.markdown("---")
     
     # Check environment variables first
     required_vars = ["GROQ_API_KEY", "GEMINI_API_KEY", "MONGODB_URI"]
@@ -470,28 +752,35 @@ def main():
                 st.info("🔄 Please refresh the page.")
                 return
 
-    # Navigation
+    # Check if user is logged in
+    if not st.session_state.logged_in:
+        login_page()
+        return
+
+    # Navigation for logged-in users
     st.sidebar.title("🛒 CARE System")
     page = st.sidebar.selectbox(
         "Navigate to:",
-        ["Customer Support", "Human Agent Dashboard"],
+        ["Customer Support", "Subscription Manager", "Human Agent Dashboard"],
         key="navigation_selector"
     )
 
     if page == "Customer Support":
         customer_support_page()
+    elif page == "Subscription Manager":
+        subscription_page()
     elif page == "Human Agent Dashboard":
         human_agent_page()
     
-    # Professional footer
+    # Clean footer
     st.sidebar.markdown("---")
-    st.sidebar.markdown("**💡 About CARE**")
-    st.sidebar.markdown("AI-powered customer support with intelligent resolution and human oversight.")
-    st.sidebar.markdown("**🔧 Features:**")
-    st.sidebar.markdown("• Automated refund processing")
-    st.sidebar.markdown("• Image damage analysis")
-    st.sidebar.markdown("• Smart escalation system")
-    st.sidebar.markdown("• Real-time analytics")
+    st.sidebar.markdown("**💡 CARE System**")
+    st.sidebar.markdown("*AI-powered customer support*")
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("🤖 **Smart AI Processing**")
+    st.sidebar.markdown("🖼️ **Image Analysis**") 
+    st.sidebar.markdown("👥 **Human Oversight**")
+    st.sidebar.markdown("📊 **Real-time Analytics**")
 
 if __name__ == "__main__":
     main()

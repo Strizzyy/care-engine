@@ -305,6 +305,69 @@ async def resolve_escalation(case_id: str, resolution: dict):
         logging.error(f"Error in resolve_escalation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/register")
+async def register_user(user_data: dict):
+    try:
+        logging.info(f"Registering new user: {user_data.get('email')}")
+        
+        # Generate customer ID
+        import random
+        customer_id = f"WM{random.randint(100, 999)}"
+        
+        # Create customer record
+        customer = {
+            "customer_id": customer_id,
+            "name": user_data.get("name"),
+            "email": user_data.get("email"),
+            "phone": user_data.get("phone"),
+            "wallet_balance": 0.0,
+            "membership": "Regular",
+            "location": user_data.get("location"),
+            "join_date": user_data.get("join_date"),
+            "total_spent": 0.0,
+            "recent_orders": [],
+            "preferred_language": "English"
+        }
+        
+        # Add to database
+        await data_handler.collections["customers"].insert_one(customer)
+        
+        logging.info(f"User registered successfully: {customer_id}")
+        return customer
+        
+    except Exception as e:
+        logging.error(f"Error in register_user: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/login")
+async def login_user(login_data: dict):
+    try:
+        email = login_data.get("email")
+        phone = login_data.get("phone")
+        
+        logging.info(f"Login attempt for email: {email}")
+        
+        # Find user by email and phone
+        customer = await data_handler.collections["customers"].find_one({
+            "email": email,
+            "phone": phone
+        })
+        
+        if customer:
+            # Convert ObjectId to string
+            customer = data_handler._convert_objectid(customer)
+            logging.info(f"Login successful for: {customer['customer_id']}")
+            return customer
+        else:
+            logging.warning(f"Login failed for email: {email}")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error in login_user: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/analytics")
 async def get_analytics():
     try:
