@@ -16,11 +16,21 @@ from io import BytesIO
 import plotly.express as px
 import logging
 
+# Create logs directory if it doesn't exist
+os.makedirs("logs", exist_ok=True)
+
 # Add src to path
 sys.path.append('src')
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging with proper file path
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("logs/streamlit_app.log"),
+        logging.StreamHandler()
+    ]
+)
 
 # Page configuration
 st.set_page_config(
@@ -84,6 +94,9 @@ def start_backend():
     
     # Start backend in background
     try:
+        # Ensure logs directory exists for backend too
+        os.makedirs("logs", exist_ok=True)
+        
         import uvicorn
         from fast_api import app
         
@@ -96,6 +109,7 @@ def start_backend():
         st.session_state.backend_started = True
         return True
     except Exception as e:
+        logging.error(f"Failed to start backend: {e}")
         st.error(f"Failed to start backend: {e}")
         return False
 
@@ -374,16 +388,22 @@ def human_agent_page():
 
 def main():
     """Main application"""
+    # Check environment variables first
+    required_vars = ["GROQ_API_KEY", "GEMINI_API_KEY", "MONGODB_URI"]
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        st.error("❌ Missing required environment variables!")
+        st.info("Please set these environment variables in Streamlit Cloud settings:")
+        for var in missing_vars:
+            st.code(f"{var} = your_{var.lower()}_here")
+        st.info("Go to your app settings → Advanced settings → Secrets to add them.")
+        return
+    
     # Start backend
     with st.spinner("Starting backend services..."):
         if not start_backend():
             st.error("❌ Failed to start backend. Please check your setup.")
-            st.info("Make sure you have set the required environment variables:")
-            st.code("""
-GROQ_API_KEY=your_key_here
-GEMINI_API_KEY=your_key_here
-MONGODB_URI=your_connection_string
-            """)
             return
 
     # Navigation
