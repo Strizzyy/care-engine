@@ -202,7 +202,8 @@ def customer_support_page():
             selected_customer = st.selectbox(
                 "Select Customer",
                 options=list(customer_options.keys()),
-                index=0 if customer_options else None
+                index=0 if customer_options else None,
+                key="customer_selector"
             )
             customer_id = customer_options.get(selected_customer)
             
@@ -222,8 +223,8 @@ def customer_support_page():
                 "My payment failed",
                 "My wallet balance shows ₹0"
             ]
-            for scenario in scenarios:
-                if st.button(scenario, key=f"scenario_{scenario}"):
+            for idx, scenario in enumerate(scenarios):
+                if st.button(scenario, key=f"scenario_{idx}_{hash(scenario)}"):
                     response = send_message(scenario, customer_id)
                     if response:
                         st.session_state.messages.append({
@@ -261,9 +262,9 @@ def customer_support_page():
             with st.form(key="chat_form", clear_on_submit=True):
                 col_input, col_file = st.columns([3, 1])
                 with col_input:
-                    prompt = st.text_input("Message", placeholder="Enter your message...")
+                    prompt = st.text_input("Message", placeholder="Enter your message...", key="chat_input")
                 with col_file:
-                    uploaded_file = st.file_uploader("Upload image", type=["jpg", "png"], label_visibility="collapsed")
+                    uploaded_file = st.file_uploader("Upload image", type=["jpg", "png"], label_visibility="collapsed", key="file_uploader")
 
                 if st.form_submit_button("Send") and customer_id:
                     user_content = prompt or ("Image uploaded" if uploaded_file else "")
@@ -364,8 +365,8 @@ def human_agent_page():
             customer_id = case.get('customer_id', 'Unknown')
             issue_details = case.get('issue_details', 'No details')
             
-            with st.expander(f"Case {case_id} - Customer {customer_id}"):
-                st.text_area("Issue Details", value=issue_details, height=100, disabled=True)
+            with st.expander(f"Case {case_id} - Customer {customer_id}", key=f"expander_{case_id}"):
+                st.text_area("Issue Details", value=issue_details, height=100, disabled=True, key=f"details_{case_id}")
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -410,7 +411,8 @@ def main():
     st.sidebar.title("🛒 CARE System")
     page = st.sidebar.selectbox(
         "Navigate to:",
-        ["Customer Support", "Human Agent Dashboard", "API Status"]
+        ["Customer Support", "Human Agent Dashboard", "API Status"],
+        key="navigation_selector"
     )
 
     if page == "Customer Support":
