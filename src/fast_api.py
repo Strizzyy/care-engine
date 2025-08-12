@@ -77,7 +77,23 @@ class SubscriptionRequest(BaseModel):
 @app.get("/health")
 async def health_check():
     logging.info("Health check endpoint called.")
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    try:
+        # Test database connection
+        customers = await data_handler.get_customers()
+        return {
+            "status": "healthy", 
+            "timestamp": datetime.now().isoformat(),
+            "database": "connected",
+            "customers_count": len(customers)
+        }
+    except Exception as e:
+        logging.error(f"Health check failed: {e}")
+        return {
+            "status": "unhealthy", 
+            "timestamp": datetime.now().isoformat(),
+            "database": "disconnected",
+            "error": str(e)
+        }
 
 @app.get("/customers")
 async def get_customers():
@@ -87,7 +103,14 @@ async def get_customers():
         logging.info(f"Fetched {len(customers)} customers.")
         return {
             "customers": [
-                {"customer_id": c["customer_id"], "name": c["name"], "membership": c["membership"], "location": c["location"]}
+                {
+                    "customer_id": c["customer_id"], 
+                    "name": c["name"], 
+                    "email": c.get("email", "N/A"),
+                    "phone": c.get("phone", "N/A"),
+                    "membership": c["membership"], 
+                    "location": c["location"]
+                }
                 for c in customers
             ]
         }
@@ -364,7 +387,7 @@ async def register_user(user_data: dict):
 @app.post("/login")
 async def login_user(login_data: dict):
     try:
-        email = login_data.get("email", "").strip().lower()
+        email = login_data.get("email", "").strip()
         phone = login_data.get("phone", "").strip()
         
         logging.info(f"Login attempt for email: {email}, phone: {phone}")
@@ -372,29 +395,34 @@ async def login_user(login_data: dict):
         if not email or not phone:
             raise HTTPException(status_code=400, detail="Email and phone are required")
         
-        # Find user by email and phone (case-insensitive email)
-        customer = await data_handler.collections["customers"].find_one({
-            "email": {"$regex": f"^{email}$", "$options": "i"},
-            "phone": phone
-        })
+        # First, try to get customer by email (case-insensitive)
+        customer = await data_handler.get_customer_by_email(email)
+        
+        if not customer:
+            # If no customer found by email, check all customers
+            all_customers = await data_handler.get_customers()
+            logging.info(f"Total customers in database: {len(all_customers)}")
+            
+            # Try exact email match
+            for c in all_customers:
+                if c.get('email', '').lower() == email.lower():
+                    customer = c
+                    break
         
         if customer:
-            # Convert ObjectId to string
-            customer = data_handler._convert_objectid(customer)
-            logging.info(f"Login successful for: {customer['customer_id']}")
-            return customer
-        else:
-            # Try to find by email only to give better error message
-            email_exists = await data_handler.collections["customers"].find_one({
-                "email": {"$regex": f"^{email}$", "$options": "i"}
-            })
+            # Check if phone matches
+            customer_phone = customer.get('phone', '').strip()
+            logging.info(f"Found customer: {customer.get('name')}, stored phone: {customer_phone}, provided phone: {phone}")
             
-            if email_exists:
-                logging.warning(f"Login failed - wrong phone for email: {email}")
-                raise HTTPException(status_code=401, detail="Invalid phone number for this email")
+            if customer_phone == phone:
+                logging.info(f"Login successful for: {customer['customer_id']}")
+                return customer
             else:
-                logging.warning(f"Login failed - email not found: {email}")
-                raise HTTPException(status_code=401, detail="Email not found. Please register first.")
+                logging.warning(f"Phone mismatch for {email}: stored={customer_phone}, provided={phone}")
+                raise HTTPException(status_code=401, detail="Invalid phone number for this email")
+        else:
+            logging.warning(f"Email not found: {email}")
+            raise HTTPException(status_code=401, detail="Email not found. Please register first.")
             
     except HTTPException:
         raise

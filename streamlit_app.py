@@ -359,8 +359,7 @@ def login_page():
                 else:
                     st.error("Please fill in all fields")
         
-        # Demo credentials helper
-        st.info("💡 **Try Demo Login:**\n\nEmail: priya.sharma@gmail.com\nPhone: 9876543210")
+
     
     with tab2:
         st.subheader("Create New Account")
@@ -391,9 +390,32 @@ def login_page():
                 else:
                     st.error("Please fill in all fields")
 
-    # Demo section
+    # Debug section
     st.markdown("---")
-    st.info("💡 **Demo Users**: You can also try with existing demo accounts from the customer list")
+    with st.expander("🔧 Debug Info"):
+        if st.button("Test Backend Connection"):
+            try:
+                response = requests.get(f"{API_BASE_URL}/health", timeout=5)
+                if response.status_code == 200:
+                    health_data = response.json()
+                    st.success(f"✅ Backend connected! Database: {health_data.get('database')}, Customers: {health_data.get('customers_count')}")
+                else:
+                    st.error(f"❌ Backend error: {response.status_code}")
+            except Exception as e:
+                st.error(f"❌ Connection failed: {e}")
+        
+        if st.button("Show Available Users"):
+            try:
+                response = requests.get(f"{API_BASE_URL}/customers", timeout=5)
+                if response.status_code == 200:
+                    customers = response.json().get('customers', [])
+                    st.write("Available users for testing:")
+                    for c in customers[:3]:  # Show first 3
+                        st.write(f"📧 {c.get('email')} | 📱 {c.get('phone')}")
+                else:
+                    st.error("Failed to fetch customers")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
 def customer_support_page():
     """Main customer support interface"""

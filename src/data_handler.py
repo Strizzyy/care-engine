@@ -65,6 +65,12 @@ class MongoDBHandler:
         doc = await self.collections["customers"].find_one({"customer_id": customer_id})
         return self._convert_objectid(doc) if doc else None
 
+    async def get_customer_by_email(self, email: str) -> Optional[Dict]:
+        doc = await self.collections["customers"].find_one({
+            "email": {"$regex": f"^{email}$", "$options": "i"}
+        })
+        return self._convert_objectid(doc) if doc else None
+
     async def get_customers(self) -> List[Dict]:
         cursor = self.collections["customers"].find()
         docs = [doc async for doc in cursor]
