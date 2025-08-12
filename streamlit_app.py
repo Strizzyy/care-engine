@@ -163,6 +163,36 @@ st.markdown("""
         border: 2px solid #e2e8f0;
     }
     
+    /* Selectbox dropdown options */
+    .stSelectbox > div > div > div {
+        background-color: white !important;
+        color: #374151 !important;
+    }
+    
+    /* Selectbox dropdown menu */
+    .stSelectbox [data-baseweb="select"] > div {
+        background-color: white !important;
+        color: #374151 !important;
+    }
+    
+    /* Selectbox options in dropdown */
+    .stSelectbox [role="option"] {
+        background-color: white !important;
+        color: #374151 !important;
+    }
+    
+    /* Selectbox option hover state */
+    .stSelectbox [role="option"]:hover {
+        background-color: #f3f4f6 !important;
+        color: #111827 !important;
+    }
+    
+    /* Selectbox selected option */
+    .stSelectbox [aria-selected="true"] {
+        background-color: #3b82f6 !important;
+        color: white !important;
+    }
+    
     /* File uploader styling */
     .stFileUploader > div {
         border-radius: 8px;
