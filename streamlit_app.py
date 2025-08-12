@@ -31,53 +31,187 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:7860")
 # Enhanced CSS for better UI
 st.markdown("""
 <style>
+    /* Hide Streamlit default elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Main container styling */
+    .main .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        max-width: 100%;
+    }
+    
+    /* Header styling */
     .main-header {
-        background: linear-gradient(135deg, #0078d4 0%, #005a9e 100%);
+        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
         color: white;
         padding: 2rem;
         border-radius: 15px;
         margin-bottom: 2rem;
         text-align: center;
-        box-shadow: 0 4px 15px rgba(0,120,212,0.3);
+        box-shadow: 0 8px 32px rgba(30, 58, 138, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
     }
+    
+    .main-header h1 {
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: 700;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .main-header p {
+        margin: 0.5rem 0 0 0;
+        font-size: 1.1rem;
+        opacity: 0.9;
+    }
+    
+    /* Customer info cards */
     .customer-info {
-        background: linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%);
+        background: linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%);
         padding: 1.5rem;
-        border-radius: 15px;
-        border-left: 6px solid #0078d4;
+        border-radius: 12px;
+        border-left: 5px solid #3b82f6;
         margin-bottom: 1.5rem;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        transition: transform 0.2s ease;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        font-size: 0.95rem;
+        line-height: 1.6;
     }
+    
     .customer-info:hover {
         transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
     }
-    .escalation-card {
-        background: linear-gradient(145deg, #fff3cd 0%, #ffeaa7 100%);
-        padding: 1rem;
-        border-radius: 12px;
-        border-left: 4px solid #ffc107;
-        margin-bottom: 1rem;
-        box-shadow: 0 2px 8px rgba(255,193,7,0.2);
-    }
+    
+    /* Metric containers */
     .metric-container {
-        background: white;
-        padding: 1rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
         margin-bottom: 1rem;
+        border: 1px solid rgba(0,0,0,0.05);
+        text-align: center;
     }
+    
+    .metric-container h4 {
+        margin: 0 0 0.5rem 0;
+        color: #64748b;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .metric-container h2 {
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: 700;
+    }
+    
+    /* Chat interface styling */
+    .stChatMessage {
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    /* Button styling */
+    .stButton > button {
+        border-radius: 8px;
+        border: none;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        background: linear-gradient(145deg, #3b82f6, #2563eb);
+        color: white;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+        background: linear-gradient(145deg, #2563eb, #1d4ed8);
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+    }
+    
+    /* Form styling */
+    .stTextInput > div > div > input {
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+        padding: 0.75rem;
+        font-size: 1rem;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Selectbox styling */
     .stSelectbox > div > div {
         background-color: white;
         border-radius: 8px;
+        border: 2px solid #e2e8f0;
     }
-    .stButton > button {
+    
+    /* File uploader styling */
+    .stFileUploader > div {
         border-radius: 8px;
+        border: 2px dashed #cbd5e1;
+        background: #f8fafc;
+    }
+    
+    /* Success/Error message styling */
+    .stSuccess {
+        background: linear-gradient(145deg, #dcfce7, #bbf7d0);
+        border-left: 5px solid #22c55e;
+        border-radius: 8px;
+    }
+    
+    .stError {
+        background: linear-gradient(145deg, #fef2f2, #fecaca);
+        border-left: 5px solid #ef4444;
+        border-radius: 8px;
+    }
+    
+    .stWarning {
+        background: linear-gradient(145deg, #fffbeb, #fef3c7);
+        border-left: 5px solid #f59e0b;
+        border-radius: 8px;
+    }
+    
+    .stInfo {
+        background: linear-gradient(145deg, #eff6ff, #dbeafe);
+        border-left: 5px solid #3b82f6;
+        border-radius: 8px;
+    }
+    
+    /* Quick action buttons */
+    .quick-action-btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+        padding: 0.75rem;
+        background: linear-gradient(145deg, #f1f5f9, #e2e8f0);
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        color: #475569;
+        font-weight: 500;
         transition: all 0.3s ease;
     }
-    .stButton > button:hover {
+    
+    .quick-action-btn:hover {
+        background: linear-gradient(145deg, #e2e8f0, #cbd5e1);
         transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -255,22 +389,26 @@ def cancel_subscription(subscription_id):
 
 def customer_support_page():
     """Main customer support interface"""
-
+    
     # Customer selection
     customers = get_customers()
     if not customers:
-        st.error("No customers found. Please check backend connection.")
+        st.error("❌ No customers found. Please check backend connection.")
+        st.info("💡 Make sure the backend service is running and accessible.")
         return
     
     # Sidebar with customer selection and quick actions
     with st.sidebar:
-        st.header("👤 Select Customer")
+        st.markdown("### 👤 Select Customer")
+        st.markdown("---")
+        
         customer_options = [f"{c.get('name', 'Unknown')} ({c.get('customer_id', 'N/A')})" for c in customers]
         selected_idx = st.selectbox(
             "Choose a customer:",
             range(len(customer_options)),
             format_func=lambda x: customer_options[x],
-            key="customer_selector"
+            key="customer_selector",
+            help="Select a customer to start providing support"
         )
         
         if selected_idx is not None:
@@ -292,16 +430,20 @@ def customer_support_page():
             """, unsafe_allow_html=True)
             
             # Quick scenarios
-            st.header("🚀 Quick Actions")
+            st.markdown("---")
+            st.markdown("### 🚀 Quick Actions")
+            st.markdown("*Click any scenario to start a conversation*")
+            
             scenarios = [
-                "I want to check my recent orders",
-                "I need help with a refund",
-                "My payment failed",
-                "Check my wallet balance",
-                "I want to track my delivery"
+                ("📦", "I want to check my recent orders"),
+                ("💰", "I need help with a refund"),
+                ("❌", "My payment failed"),
+                ("💳", "Check my wallet balance"),
+                ("🚚", "I want to track my delivery")
             ]
-            for idx, scenario in enumerate(scenarios):
-                if st.button(scenario, key=f"scenario_{idx}_{hash(scenario)}"):
+            
+            for idx, (icon, scenario) in enumerate(scenarios):
+                if st.button(f"{icon} {scenario}", key=f"scenario_{idx}_{hash(scenario)}", use_container_width=True):
                     response = send_message(scenario, customer_id)
                     if response:
                         st.session_state.messages.append({
@@ -320,32 +462,86 @@ def customer_support_page():
         else:
             customer_id = None
 
-    # Main content
-    col1, col2 = st.columns([2, 1])
+    # Main content area
+    if not customer_id:
+        # Welcome screen when no customer is selected
+        st.markdown("""
+        <div style="text-align: center; padding: 3rem; background: linear-gradient(145deg, #f8fafc, #e2e8f0); border-radius: 15px; margin: 2rem 0;">
+            <h2 style="color: #475569; margin-bottom: 1rem;">👋 Welcome to CARE Support</h2>
+            <p style="color: #64748b; font-size: 1.1rem; margin-bottom: 2rem;">
+                Select a customer from the sidebar to start providing AI-powered support
+            </p>
+            <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;">
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🤖</div>
+                    <div style="font-weight: 600; color: #475569;">AI-Powered</div>
+                    <div style="color: #64748b; font-size: 0.9rem;">Smart responses</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🖼️</div>
+                    <div style="font-weight: 600; color: #475569;">Image Analysis</div>
+                    <div style="color: #64748b; font-size: 0.9rem;">Visual validation</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">⚡</div>
+                    <div style="font-weight: 600; color: #475569;">Fast Resolution</div>
+                    <div style="color: #64748b; font-size: 0.9rem;">Quick solutions</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+    
+    # Chat interface when customer is selected
+    col1, col2 = st.columns([2, 1], gap="large")
 
     with col1:
-        st.header("💬 Chat Support")
-        
-        if not customer_id:
-            st.info("Please select a customer from the sidebar to start chatting.")
-        else:
-            # Display chat history
-            for message in st.session_state.messages:
-                with st.chat_message(message["role"]):
-                    st.write(message["content"])
-                    if message["role"] == "assistant":
-                        if message.get("intent"):
-                            st.caption(f"Intent: {message['intent']} | Status: {message.get('status', 'N/A')}")
+        st.markdown("### 💬 Chat Support")
+        st.markdown("---")
+        # Chat history container
+        chat_container = st.container()
+        with chat_container:
+            if st.session_state.messages:
+                for message in st.session_state.messages:
+                    with st.chat_message(message["role"]):
+                        st.write(message["content"])
+                        if message["role"] == "assistant":
+                            if message.get("intent"):
+                                st.caption(f"🎯 Intent: {message['intent']} | 📊 Status: {message.get('status', 'N/A')}")
+            else:
+                st.info("💬 Start a conversation by typing a message or using quick actions from the sidebar!")
 
-            # Chat input
-            with st.form(key="chat_form", clear_on_submit=True):
-                col_input, col_file = st.columns([3, 1])
-                with col_input:
-                    prompt = st.text_input("Message", placeholder="Enter your message...", key="chat_input")
-                with col_file:
-                    uploaded_file = st.file_uploader("Upload image", type=["jpg", "png"], label_visibility="collapsed", key="file_uploader")
+        # Chat input form
+        st.markdown("---")
+        with st.form(key="chat_form", clear_on_submit=True):
+            st.markdown("**💬 Send a message:**")
+            col_input, col_file = st.columns([3, 1])
+            
+            with col_input:
+                prompt = st.text_input(
+                    "Message", 
+                    placeholder="Type your message here...", 
+                    key="chat_input",
+                    label_visibility="collapsed"
+                )
+            
+            with col_file:
+                uploaded_file = st.file_uploader(
+                    "📎 Upload image", 
+                    type=["jpg", "jpeg", "png"], 
+                    help="Upload an image for refund validation",
+                    key="file_uploader"
+                )
 
-                if st.form_submit_button("Send") and customer_id:
+            col_send, col_clear = st.columns([1, 1])
+            with col_send:
+                send_clicked = st.form_submit_button("🚀 Send Message", use_container_width=True)
+            with col_clear:
+                if st.form_submit_button("🗑️ Clear Chat", use_container_width=True):
+                    st.session_state.messages = []
+                    st.rerun()
+
+            if send_clicked and customer_id:
                     user_content = prompt or ("Image uploaded" if uploaded_file else "")
                     
                     if user_content or uploaded_file:
@@ -389,65 +585,80 @@ def customer_support_page():
                         st.rerun()
 
     with col2:
-        # Customer details
+        # Customer details section
         if customer_id and st.session_state.selected_customer:
             customer = st.session_state.selected_customer
-            st.header("👤 Customer Details")
+            st.markdown("### 👤 Customer Details")
+            st.markdown("---")
+            
             st.markdown(f"""
             <div class="customer-info">
-                <strong>Name:</strong> {customer.get('name', 'N/A')}<br>
-                <strong>ID:</strong> {customer.get('customer_id', 'N/A')}<br>
-                <strong>Email:</strong> {customer.get('email', 'N/A')}<br>
-                <strong>Wallet:</strong> ₹{customer.get('wallet_balance', 0)}<br>
-                <strong>Membership:</strong> {customer.get('membership', 'N/A')}<br>
-                <strong>Location:</strong> {customer.get('location', 'N/A')}
+                <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+                    <div style="font-size: 2rem; margin-right: 1rem;">👤</div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 1.2rem; color: #1e40af;">{customer.get('name', 'N/A')}</div>
+                        <div style="color: #64748b; font-size: 0.9rem;">ID: {customer.get('customer_id', 'N/A')}</div>
+                    </div>
+                </div>
+                <div style="display: grid; gap: 0.5rem;">
+                    <div><strong>📧 Email:</strong> {customer.get('email', 'N/A')}</div>
+                    <div><strong>📱 Phone:</strong> {customer.get('phone', 'N/A')}</div>
+                    <div><strong>📍 Location:</strong> {customer.get('location', 'N/A')}</div>
+                    <div><strong>💳 Wallet:</strong> <span style="color: #059669; font-weight: 600;">₹{customer.get('wallet_balance', 0)}</span></div>
+                    <div><strong>⭐ Membership:</strong> <span style="color: #7c3aed; font-weight: 600;">{customer.get('membership', 'Regular')}</span></div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
-        # Enhanced stats display
-        st.header("📊 System Analytics")
+        # System Analytics section
+        st.markdown("### 📊 System Analytics")
+        st.markdown("---")
+        
         try:
             response = requests.get(f"{API_BASE_URL}/analytics", timeout=5)
             if response.status_code == 200:
                 analytics = response.json()
                 
-                # Main metrics in cards
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown("""
-                    <div class="metric-container">
-                        <h4>🔢 Total Interactions</h4>
-                        <h2 style="color: #0078d4;">{}</h2>
-                    </div>
-                    """.format(analytics.get('total_interactions', 0)), unsafe_allow_html=True)
-                    
-                with col2:
-                    st.markdown("""
-                    <div class="metric-container">
-                        <h4>✅ Resolution Rate</h4>
-                        <h2 style="color: #22c55e;">{}%</h2>
-                    </div>
-                    """.format(analytics.get('resolution_rate', 0)), unsafe_allow_html=True)
+                # Main metrics
+                st.markdown(f"""
+                <div class="metric-container">
+                    <h4>🔢 Total Interactions</h4>
+                    <h2 style="color: #3b82f6;">{analytics.get('total_interactions', 0)}</h2>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                # Additional metrics
-                col3, col4 = st.columns(2)
-                with col3:
-                    st.metric("⚡ Avg Response", f"{analytics.get('avg_response_time', 0)}s")
-                with col4:
+                st.markdown(f"""
+                <div class="metric-container">
+                    <h4>✅ Resolution Rate</h4>
+                    <h2 style="color: #10b981;">{analytics.get('resolution_rate', 0)}%</h2>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Additional metrics in smaller format
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.metric("⚡ Response", f"{analytics.get('avg_response_time', 0)}s")
+                with col_b:
                     if analytics.get('customer_satisfaction'):
-                        st.metric("⭐ Satisfaction", f"{analytics.get('customer_satisfaction', 0)}/5")
+                        st.metric("⭐ Rating", f"{analytics.get('customer_satisfaction', 0)}/5")
                     else:
-                        st.metric("🎯 System Status", "Active")
+                        st.metric("🎯 Status", "Active")
                         
             else:
                 st.markdown("""
                 <div class="metric-container">
                     <h4>📊 Analytics Dashboard</h4>
-                    <p>Start using the system to see analytics here</p>
+                    <p style="color: #64748b; margin: 0;">Start conversations to see metrics</p>
                 </div>
                 """, unsafe_allow_html=True)
+                
         except Exception as e:
-            st.info("📊 Analytics loading...")
+            st.markdown("""
+            <div class="metric-container">
+                <h4>📊 Analytics Loading...</h4>
+                <p style="color: #64748b; margin: 0;">Please wait while we fetch the data</p>
+            </div>
+            """, unsafe_allow_html=True)
 
 def subscription_page():
     """Subscription management page"""
@@ -668,12 +879,21 @@ def main():
     """, unsafe_allow_html=True)
     
     # Navigation
-    st.sidebar.title("🛒 CARE System")
-    page = st.sidebar.selectbox(
-        "Navigate to:",
-        ["Customer Support", "Subscription Manager", "Human Agent Dashboard"],
-        key="navigation_selector"
-    )
+    with st.sidebar:
+        st.markdown("""
+        <div style="text-align: center; padding: 1rem; background: linear-gradient(145deg, #1e40af, #3b82f6); border-radius: 10px; margin-bottom: 2rem;">
+            <h2 style="color: white; margin: 0; font-size: 1.5rem;">🛒 CARE System</h2>
+            <p style="color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 0.9rem;">AI Customer Support</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("### 🧭 Navigation")
+        page = st.selectbox(
+            "Choose a section:",
+            ["Customer Support", "Subscription Manager", "Human Agent Dashboard"],
+            key="navigation_selector",
+            help="Select the section you want to access"
+        )
 
     if page == "Customer Support":
         customer_support_page()
@@ -682,15 +902,27 @@ def main():
     elif page == "Human Agent Dashboard":
         human_agent_page()
     
-    # Clean footer
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**💡 CARE System**")
-    st.sidebar.markdown("*AI-powered customer support*")
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("🤖 **Smart AI Processing**")
-    st.sidebar.markdown("🖼️ **Image Analysis**") 
-    st.sidebar.markdown("👥 **Human Oversight**")
-    st.sidebar.markdown("📊 **Real-time Analytics**")
+    # Enhanced footer
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown("""
+        <div style="background: linear-gradient(145deg, #f1f5f9, #e2e8f0); padding: 1rem; border-radius: 10px; text-align: center;">
+            <div style="font-weight: 600; color: #475569; margin-bottom: 0.5rem;">✨ System Features</div>
+            <div style="display: grid; gap: 0.3rem; font-size: 0.85rem; color: #64748b;">
+                <div>🤖 Smart AI Processing</div>
+                <div>🖼️ Image Analysis</div>
+                <div>👥 Human Oversight</div>
+                <div>📊 Real-time Analytics</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="text-align: center; margin-top: 1rem; padding: 0.5rem; color: #94a3b8; font-size: 0.8rem;">
+            <div>💡 CARE System v1.0</div>
+            <div>AI-powered customer support</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
